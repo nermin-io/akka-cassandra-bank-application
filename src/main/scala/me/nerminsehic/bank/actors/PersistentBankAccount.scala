@@ -4,14 +4,21 @@ import akka.actor.typed.{ActorRef, Behavior}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 
-class PersistentBankAccount {
+object PersistentBankAccount {
+
+  import Command._
+  // command handler => message handler => persist an event
+  // event handler => update state
+  // state
 
   // commands
   sealed trait Command
 
-  case class CreateBankAccount(user: String, currency: String, initialBalance: Int, replyTo: ActorRef[Response]) extends Command
-  case class UpdateBalance(id: String, currency: String, amount: Int, replyTo: ActorRef[Response]) extends Command
-  case class GetBankAccount(id: String, replyTo: ActorRef[Response]) extends Command
+  object Command {
+    case class CreateBankAccount(user: String, currency: String, initialBalance: Int, replyTo: ActorRef[Response]) extends Command
+    case class UpdateBalance(id: String, currency: String, amount: Int, replyTo: ActorRef[Response]) extends Command
+    case class GetBankAccount(id: String, replyTo: ActorRef[Response]) extends Command
+  }
 
   // events
   trait Event
@@ -26,10 +33,6 @@ class PersistentBankAccount {
   case class BankAccountCreatedResponse(id: String) extends Response
   case class BankAccountBalanceUpdatedResponse(maybeBankAccount: Option[BankAccount]) extends Response
   case class GetBankAccountResponse(maybeBankAccount: Option[BankAccount]) extends Response
-
-  // command handler => message handler => persist an event
-  // event handler => update state
-  // state
 
   private val commandHandler: (BankAccount, Command) => Effect[Event, BankAccount] = (state, command) =>
     command match {
