@@ -7,6 +7,7 @@ import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
 object PersistentBankAccount {
 
   import Command._
+  import Response._
   // command handler => message handler => persist an event
   // event handler => update state
   // state
@@ -30,9 +31,12 @@ object PersistentBankAccount {
 
   // responses
   sealed trait Response
-  case class BankAccountCreatedResponse(id: String) extends Response
-  case class BankAccountBalanceUpdatedResponse(maybeBankAccount: Option[BankAccount]) extends Response
-  case class GetBankAccountResponse(maybeBankAccount: Option[BankAccount]) extends Response
+
+  object Response {
+    case class BankAccountCreatedResponse(id: String) extends Response
+    case class BankAccountBalanceUpdatedResponse(maybeBankAccount: Option[BankAccount]) extends Response
+    case class GetBankAccountResponse(maybeBankAccount: Option[BankAccount]) extends Response
+  }
 
   private val commandHandler: (BankAccount, Command) => Effect[Event, BankAccount] = (state, command) =>
     command match {
