@@ -1,12 +1,14 @@
 package me.nerminsehic.bank.actors
 
+import akka.NotUsed
 import akka.actor.typed.scaladsl.{ActorContext, Behaviors}
-import akka.actor.typed.{ActorRef, Behavior}
+import akka.actor.typed.{ActorRef, ActorSystem, Behavior, Scheduler}
 import akka.persistence.typed.PersistenceId
 import akka.persistence.typed.scaladsl.{Effect, EventSourcedBehavior}
-
+import akka.util.Timeout
 
 import java.util.UUID
+import scala.concurrent.ExecutionContext
 
 object Bank {
 
@@ -66,4 +68,40 @@ object Bank {
     )
   }
 
+}
+
+object Playground {
+  import PersistentBankAccount.Command._
+  import PersistentBankAccount.Response._
+  import PersistentBankAccount.Response
+
+  def main(args: Array[String]): Unit = {
+    val rootBehavior: Behavior[NotUsed] = Behaviors.setup { context =>
+      val bank = context.spawn(Bank(), "bank")
+      val logger = context.log
+      val responseHandler = context.spawn(Behaviors.receiveMessage[Response]{
+        case BankAccountCreatedResponse(id) =>
+          logger.info(s"successfully created bank account $id")
+          Behaviors.same
+
+        case GetBankAccountResponse(maybeBankAccount) =>
+          logger.info(s"Account details: $maybeBankAccount")
+          Behaviors.same
+      }, "responseHandler")
+
+      // ask pattern
+      import akka.actor.typed.scaladsl.AskPattern._
+      import scala.concurrent.duration._
+
+      implicit val timeout: Timeout = Timeout(2.seconds)
+      implicit val scheduler: Scheduler = context.system.scheduler
+      implicit val ec: ExecutionContext = context.executionContext
+
+//      bank ! CreateBankAccount("nermin", "USD", 10, responseHandler)
+      bank ! GetBankAccount("2b9ca073-906c-4ab8-b786-d121b27f99e6", responseHandler)
+      Behaviors.empty
+    }
+
+    val system = ActorSystem(rootBehavior, "BankDemo")
+  }
 }
