@@ -19,6 +19,8 @@ import akka.http.scaladsl.server.Route
 import cats.data.Validated.{Invalid, Valid}
 import cats.implicits._
 
+import scala.util.{Failure, Success}
+
 object BankAccountCreationRequest {
   implicit val validator: Validator[BankAccountCreationRequest] = new Validator[BankAccountCreationRequest] {
     override def validate(request: BankAccountCreationRequest): ValidationResult[BankAccountCreationRequest] = {
@@ -96,7 +98,7 @@ class BankRouter(bank: ActorRef[Command])(implicit system: ActorSystem[_]) {
         - 200 OK
           Payload of new bank account as JSON
         - 404 NOT FOUND
-        - TODO 400 BAD REQUEST
+        - 400 BAD REQUEST
    */
   val routes =
     pathPrefix("bank") {
@@ -132,11 +134,11 @@ class BankRouter(bank: ActorRef[Command])(implicit system: ActorSystem[_]) {
               // validation
               validateRequest(request) {
                 onSuccess(updateBankAccount(id, request)) {
-                  case BankAccountBalanceUpdatedResponse(Some(account)) =>
+                  case BankAccountBalanceUpdatedResponse(Success(account)) =>
                     complete(account)
 
-                  case BankAccountBalanceUpdatedResponse(None) =>
-                    complete(StatusCodes.NotFound, FailureResponse(s"Bank account $id cannot be found"))
+                  case BankAccountBalanceUpdatedResponse(Failure(ex)) =>
+                    complete(StatusCodes.BadRequest, FailureResponse(s"${ex.getMessage}"))
                 }
               }
             }

@@ -9,6 +9,7 @@ import akka.util.Timeout
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext
+import scala.util.Failure
 
 object Bank {
 
@@ -36,7 +37,7 @@ object Bank {
             Effect.reply(account)(updateCommand)
 
           case None =>
-            Effect.reply(replyTo)(BankAccountBalanceUpdatedResponse(None))
+            Effect.reply(replyTo)(BankAccountBalanceUpdatedResponse(Failure(new RuntimeException("Bank account cannot be found"))))
         }
 
       case getCommand @ GetBankAccount(id, replyTo) =>
