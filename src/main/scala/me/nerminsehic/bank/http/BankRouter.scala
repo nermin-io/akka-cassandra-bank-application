@@ -14,15 +14,43 @@ import akka.util.Timeout
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
+import Validation._
+import akka.http.scaladsl.server.Route
+import cats.data.Validated.{Invalid, Valid}
+import cats.implicits._
+
+object BankAccountCreationRequest {
+  implicit val validator: Validator[BankAccountCreationRequest] = new Validator[BankAccountCreationRequest] {
+    override def validate(request: BankAccountCreationRequest): ValidationResult[BankAccountCreationRequest] = {
+      val userValidation = validateRequired(request.user, "user")
+      val currencyValidation = validateRequired(request.currency, "currency")
+      val balanceValidation = validateMinimum(request.balance, 0, "balance")
+        .combine(validateMinimumAbs(request.balance, 0, "balance"))
+
+      (userValidation, currencyValidation, balanceValidation).mapN(BankAccountCreationRequest.apply)
+    }
+  }
+}
 
 case class BankAccountCreationRequest(user: String, currency: String, balance: Int) {
   def toCommand(replyTo: ActorRef[Response]): Command
-    = CreateBankAccount(user, currency, balance, replyTo)
+  = CreateBankAccount(user, currency, balance, replyTo)
+}
+
+object BankAccountUpdateRequest {
+  implicit val validator: Validator[BankAccountUpdateRequest] = new Validator[BankAccountUpdateRequest] {
+    override def validate(request: BankAccountUpdateRequest): ValidationResult[BankAccountUpdateRequest] = {
+      val currencyValidation = validateRequired(request.currency, "currency")
+      val amountValidation = validateMinimumAbs(request.amount, 1, "amount")
+
+      (currencyValidation, amountValidation).mapN(BankAccountUpdateRequest.apply)
+    }
+  }
 }
 
 case class BankAccountUpdateRequest(currency: String, amount: Int) {
   def toCommand(id: String, replyTo: ActorRef[Response]): Command
-    = UpdateBalance(id, currency, amount, replyTo)
+  = UpdateBalance(id, currency, amount, replyTo)
 }
 
 case class FailureResponse(reason: String)
@@ -38,6 +66,17 @@ class BankRouter(bank: ActorRef[Command])(implicit system: ActorSystem[_]) {
 
   private def updateBankAccount(id: String, request: BankAccountUpdateRequest): Future[Response] =
     bank.ask(replyTo => request.toCommand(id, replyTo))
+
+  def validateRequest[R: Validator](request: R)(routeIfValid: Route): Route =
+    validateEntity(request) match {
+      case Valid(_) =>
+        routeIfValid
+      case Invalid(failures) =>
+        complete(
+          StatusCodes.BadRequest,
+          FailureResponse(failures.toList.map(_.errorMessage).mkString(", "))
+        )
+    }
 
   /*
     POST /bank/
@@ -65,12 +104,16 @@ class BankRouter(bank: ActorRef[Command])(implicit system: ActorSystem[_]) {
         post {
           entity(as[BankAccountCreationRequest]) { request =>
 
-            onSuccess(createBankAccount(request)) {
-              case BankAccountCreatedResponse(id) =>
-                respondWithHeader(Location(s"/bank/$id")) {
-                  complete(StatusCodes.Created)
-                }
+            // validation
+            validateRequest(request) {
+              onSuccess(createBankAccount(request)) {
+                case BankAccountCreatedResponse(id) =>
+                  respondWithHeader(Location(s"/bank/$id")) {
+                    complete(StatusCodes.Created)
+                  }
+              }
             }
+
           }
         }
       } ~
@@ -86,12 +129,15 @@ class BankRouter(bank: ActorRef[Command])(implicit system: ActorSystem[_]) {
           } ~ put {
             entity(as[BankAccountUpdateRequest]) { request =>
 
-              onSuccess(updateBankAccount(id, request)) {
-                case BankAccountBalanceUpdatedResponse(Some(account)) =>
-                  complete(account)
+              // validation
+              validateRequest(request) {
+                onSuccess(updateBankAccount(id, request)) {
+                  case BankAccountBalanceUpdatedResponse(Some(account)) =>
+                    complete(account)
 
-                case BankAccountBalanceUpdatedResponse(None) =>
-                  complete(StatusCodes.NotFound, FailureResponse(s"Bank account $id cannot be found"))
+                  case BankAccountBalanceUpdatedResponse(None) =>
+                    complete(StatusCodes.NotFound, FailureResponse(s"Bank account $id cannot be found"))
+                }
               }
             }
           }

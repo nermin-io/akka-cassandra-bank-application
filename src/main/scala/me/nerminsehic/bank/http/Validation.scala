@@ -10,16 +10,20 @@ object Validation {
 
   // minimum value
   trait Minimum[A] extends ((A, Int) => Boolean)
+  trait MinimumAbs[A] extends ((A, Int) => Boolean)
 
 
   // TC instances
   implicit val requiredString: Required[String] = _.nonEmpty
   implicit val minimumInt: Minimum[Int] = _ >= _
   implicit val minimumDouble: Minimum[Double] = _ >= _
+  implicit val minimumIntAbs: MinimumAbs[Int] = Math.abs(_) >= _
+  implicit val minimumDoubleAbs: MinimumAbs[Double] = Math.abs(_) >= _
 
   // usage
   def required[A](value: A)(implicit req: Required[A]): Boolean = req(value)
   def minimum[A](value: A, threshold: Int)(implicit min: Minimum[A]): Boolean = min(value, threshold)
+  def minimumAbs[A](value: A, threshold: Int)(implicit min: MinimumAbs[A]): Boolean = min(value, threshold)
 
   type ValidationResult[A] = ValidatedNel[ValidationFailure, A]
 
@@ -47,6 +51,11 @@ object Validation {
     else BelowMinimumValue(fieldName, threshold).invalidNel
   }
 
+  def validateMinimumAbs[A: MinimumAbs](value: A, threshold: Int, fieldName: String): ValidationResult[A] = {
+    if(minimumAbs(value, threshold)) value.validNel
+    else BelowMinimumValue(fieldName, threshold).invalidNel
+  }
+
   def validateRequired[A: Required](value: A, fieldName: String): ValidationResult[A] =
     if(required(value)) value.validNel
     else EmptyField(fieldName).invalidNel
@@ -55,6 +64,6 @@ object Validation {
     def validate(value: A): ValidationResult[A]
   }
 
-  def validateRequest[A](value: A)(implicit validator: Validator[A]): ValidationResult[A] =
+  def validateEntity[A](value: A)(implicit validator: Validator[A]): ValidationResult[A] =
     validator.validate(value)
 }
