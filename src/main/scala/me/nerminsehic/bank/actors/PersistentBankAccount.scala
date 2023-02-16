@@ -19,13 +19,17 @@ object PersistentBankAccount {
 
   object Command {
     case class CreateBankAccount(user: String, currency: String, initialBalance: Int, replyTo: ActorRef[Response]) extends Command
+
     case class UpdateBalance(id: String, currency: String, amount: Int, replyTo: ActorRef[Response]) extends Command
+
     case class GetBankAccount(id: String, replyTo: ActorRef[Response]) extends Command
   }
 
   // events
   trait Event
+
   case class BankAccountCreated(bankAccount: BankAccount) extends Event
+
   case class BalanceUpdated(amount: Int) extends Event
 
   // state
@@ -36,7 +40,9 @@ object PersistentBankAccount {
 
   object Response {
     case class BankAccountCreatedResponse(id: String) extends Response
+
     case class BankAccountBalanceUpdatedResponse(maybeBankAccount: Try[BankAccount]) extends Response
+
     case class GetBankAccountResponse(maybeBankAccount: Option[BankAccount]) extends Response
   }
 
@@ -50,7 +56,7 @@ object PersistentBankAccount {
 
       case UpdateBalance(_, _, amount, replyTo) =>
         val newBalance = state.balance + amount
-        if(newBalance < 0) // illegal
+        if (newBalance < 0) // illegal
           Effect.reply(replyTo)(BankAccountBalanceUpdatedResponse(Failure(new RuntimeException("Cannot withdraw more than available"))))
         else
           Effect

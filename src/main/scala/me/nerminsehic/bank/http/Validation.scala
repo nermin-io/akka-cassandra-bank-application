@@ -10,6 +10,7 @@ object Validation {
 
   // minimum value
   trait Minimum[A] extends ((A, Int) => Boolean)
+
   trait MinimumAbs[A] extends ((A, Int) => Boolean)
 
 
@@ -21,12 +22,13 @@ object Validation {
   implicit val minimumDoubleAbs: MinimumAbs[Double] = Math.abs(_) >= _
 
   // usage
-  def required[A](value: A)(implicit req: Required[A]): Boolean = req(value)
-  def minimum[A](value: A, threshold: Int)(implicit min: Minimum[A]): Boolean = min(value, threshold)
-  def minimumAbs[A](value: A, threshold: Int)(implicit min: MinimumAbs[A]): Boolean = min(value, threshold)
+  private def required[A](value: A)(implicit req: Required[A]): Boolean = req(value)
+
+  private def minimum[A](value: A, threshold: Int)(implicit min: Minimum[A]): Boolean = min(value, threshold)
+
+  private def minimumAbs[A](value: A, threshold: Int)(implicit min: MinimumAbs[A]): Boolean = min(value, threshold)
 
   type ValidationResult[A] = ValidatedNel[ValidationFailure, A]
-
 
   // validation failures
   trait ValidationFailure {
@@ -46,18 +48,18 @@ object Validation {
   }
 
   def validateMinimum[A: Minimum](value: A, threshold: Int, fieldName: String): ValidationResult[A] = {
-    if(minimum(value, threshold)) value.validNel
-    else if(threshold == 0) NegativeValue(fieldName).invalidNel
+    if (minimum(value, threshold)) value.validNel
+    else if (threshold == 0) NegativeValue(fieldName).invalidNel
     else BelowMinimumValue(fieldName, threshold).invalidNel
   }
 
   def validateMinimumAbs[A: MinimumAbs](value: A, threshold: Int, fieldName: String): ValidationResult[A] = {
-    if(minimumAbs(value, threshold)) value.validNel
+    if (minimumAbs(value, threshold)) value.validNel
     else BelowMinimumValue(fieldName, threshold).invalidNel
   }
 
   def validateRequired[A: Required](value: A, fieldName: String): ValidationResult[A] =
-    if(required(value)) value.validNel
+    if (required(value)) value.validNel
     else EmptyField(fieldName).invalidNel
 
   trait Validator[A] {
